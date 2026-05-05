@@ -71,16 +71,16 @@ export const treasurerLogin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const ip = getRequestIP({ xForwardedFor: true }) ?? "unknown";
     if (!rateLimit(`login:${ip}`, 5, 60_000)) {
-      throw new Error("Too many attempts. Try again in a minute.");
+      return { ok: false as const, error: "Too many attempts. Try again in a minute." };
     }
     const expected = process.env.TREASURER_TOKEN;
-    if (!expected) throw new Error("Treasurer token not configured on server.");
+    if (!expected) return { ok: false as const, error: "Treasurer token not configured on server." };
     if (!safeEqual(data.token, expected)) {
-      throw new Error("Invalid token.");
+      return { ok: false as const, error: "Invalid token." };
     }
     const session = await useSession<TreasurerSession>(getSessionConfig());
     await session.update({ authenticated: true, loginAt: Date.now() });
-    return { ok: true };
+    return { ok: true as const };
   });
 
 export const treasurerLogout = createServerFn({ method: "POST" }).handler(async () => {
