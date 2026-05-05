@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { useSession, getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { SESSION_CONFIG, safeEqual, rateLimit, type TreasurerSession } from "./treasury.server";
+import { getSessionConfig, safeEqual, rateLimit, type TreasurerSession } from "./treasury.server";
 
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -78,24 +78,24 @@ export const treasurerLogin = createServerFn({ method: "POST" })
     if (!safeEqual(data.token, expected)) {
       throw new Error("Invalid token.");
     }
-    const session = await useSession<TreasurerSession>(SESSION_CONFIG);
+    const session = await useSession<TreasurerSession>(getSessionConfig());
     await session.update({ authenticated: true, loginAt: Date.now() });
     return { ok: true };
   });
 
 export const treasurerLogout = createServerFn({ method: "POST" }).handler(async () => {
-  const session = await useSession<TreasurerSession>(SESSION_CONFIG);
+  const session = await useSession<TreasurerSession>(getSessionConfig());
   await session.clear();
   return { ok: true };
 });
 
 export const treasurerStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await useSession<TreasurerSession>(SESSION_CONFIG);
+  const session = await useSession<TreasurerSession>(getSessionConfig());
   return { authenticated: !!session.data.authenticated };
 });
 
 async function requireAuth() {
-  const session = await useSession<TreasurerSession>(SESSION_CONFIG);
+  const session = await useSession<TreasurerSession>(getSessionConfig());
   if (!session.data.authenticated) throw new Error("Unauthorized");
 }
 

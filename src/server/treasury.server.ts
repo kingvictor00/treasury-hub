@@ -1,16 +1,31 @@
+import { createHash } from "node:crypto";
 import type { SessionConfig } from "@tanstack/react-start/server";
 
-export const SESSION_CONFIG: SessionConfig = {
-  password: process.env.SESSION_SECRET ?? "dev-insecure-fallback-please-set-SESSION_SECRET-now",
-  name: "treasurer_session",
-  maxAge: 60 * 60 * 8, // 8 hours
-  cookie: {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-  },
-};
+const MIN_SESSION_PASSWORD_LENGTH = 32;
+const FALLBACK_SESSION_SECRET = "dev-insecure-fallback-please-set-SESSION_SECRET-now";
+
+function normalizeSessionPassword(secret?: string) {
+  const value = secret?.trim() || FALLBACK_SESSION_SECRET;
+  if (value.length >= MIN_SESSION_PASSWORD_LENGTH) {
+    return value;
+  }
+
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function getSessionConfig(): SessionConfig {
+  return {
+    password: normalizeSessionPassword(process.env.SESSION_SECRET),
+    name: "treasurer_session",
+    maxAge: 60 * 60 * 8, // 8 hours
+    cookie: {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+    },
+  };
+}
 
 export type TreasurerSession = { authenticated?: boolean; loginAt?: number };
 
