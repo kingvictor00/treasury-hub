@@ -48,8 +48,11 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try { await login({ data: { token } }); onSuccess(); }
-    catch (err) { toast.error(err instanceof Error ? err.message : "Login failed"); }
+    try {
+      const res = await login({ data: { token } });
+      if (res.ok) onSuccess();
+      else toast.error(res.error);
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Login failed"); }
     finally { setLoading(false); }
   };
   return (
