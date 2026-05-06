@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession, getRequestIP } from "@tanstack/react-start/server";
+import { getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getSessionConfig, safeEqual, rateLimit, type TreasurerSession } from "./treasury.server";
+import { safeEqual, rateLimit } from "./treasury.server";
 
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -78,30 +78,33 @@ export const treasurerLogin = createServerFn({ method: "POST" })
     if (!safeEqual(data.token, expected)) {
       return { ok: false as const, error: "Invalid token." };
     }
-    const session = await useSession<TreasurerSession>(getSessionConfig());
-    await session.update({ authenticated: true, loginAt: Date.now() });
     return { ok: true as const };
   });
 
 export const treasurerLogout = createServerFn({ method: "POST" }).handler(async () => {
-  const session = await useSession<TreasurerSession>(getSessionConfig());
-  await session.clear();
   return { ok: true };
 });
 
-export const treasurerStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await useSession<TreasurerSession>(getSessionConfig());
-  return { authenticated: !!session.data.authenticated };
-});
+export const treasurerStatus = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ token: z.string().optional() }).parse(d))
+  .handler(async ({ data }) => {
+    const expected = process.env.TREASURER_TOKEN;
+    return { authenticated: !!(expected && data.token && safeEqual(data.token, expected)) };
+  });
 
-async function requireAuth() {
-  const session = await useSession<TreasurerSession>(getSessionConfig());
-  if (!session.data.authenticated) throw new Error("Unauthorized");
+function requireAuth(token?: string) {
+  const expected = process.env.TREASURER_TOKEN;
+  if (!expected || !token || !safeEqual(token, expected)) throw new Error("Unauthorized");
 }
 
+const authed = <T extends z.ZodTypeAny>(schema: T) =>
+  z.object({ token: z.string().min(1).max(512) }).and(schema);
+
 // ---------- Treasurer dashboard data ----------
-export const getDashboard = createServerFn({ method: "GET" }).handler(async () => {
-  await requireAuth();
+export const getDashboard = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ token: z.string().min(1).max(512) }).parse(d))
+  .handler(async ({ data }) => {
+    requireAuth(data.token);
   const [paymentsRes, expRes] = await Promise.all([
     supabaseAdmin.from("payments").select("id, name, state_code, amount, receipt_path, created_at").order("created_at", { ascending: false }).limit(1000),
     supabaseAdmin.from("expenditures").select("id, description, amount, date, created_at").order("date", { ascending: false }).limit(1000),
@@ -123,9 +126,9 @@ export const getDashboard = createServerFn({ method: "GET" }).handler(async () =
 
 // Signed URL for a receipt (treasurer only)
 export const getReceiptUrl = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ path: z.string().min(1).max(512) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ token: z.string().min(1).max(512), path: z.string().min(1).max(512) }).parse(d))
   .handler(async ({ data }) => {
-    await requireAuth();
+    requireAuth(data.token);
     const { data: signed, error } = await supabaseAdmin.storage
       .from("receipts")
       .createSignedUrl(data.path, 60 * 5);
@@ -141,12 +144,13 @@ const expSchema = z.object({
 });
 
 export const createExpenditure = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => expSchema.parse(d))
+  .inputValidator((d: unknown) => expSchema.extend({ token: z.string().min(1).max(512) }).parse(d))
   .handler(async ({ data }) => {
-    await requireAuth();
+    const { token, ...rest } = data;
+    requireAuth(token);
     const { data: row, error } = await supabaseAdmin
       .from("expenditures")
-      .insert(data)
+      .insert(rest)
       .select()
       .single();
     if (error) throw new Error(error.message);
@@ -154,10 +158,10 @@ export const createExpenditure = createServerFn({ method: "POST" })
   });
 
 export const updateExpenditure = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => expSchema.extend({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => expSchema.extend({ id: z.string().uuid(), token: z.string().min(1).max(512) }).parse(d))
   .handler(async ({ data }) => {
-    await requireAuth();
-    const { id, ...rest } = data;
+    const { id, token, ...rest } = data;
+    requireAuth(token);
     const { data: row, error } = await supabaseAdmin
       .from("expenditures")
       .update(rest)
@@ -169,9 +173,9 @@ export const updateExpenditure = createServerFn({ method: "POST" })
   });
 
 export const deleteExpenditure = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), token: z.string().min(1).max(512) }).parse(d))
   .handler(async ({ data }) => {
-    await requireAuth();
+    requireAuth(data.token);
     const { error } = await supabaseAdmin.from("expenditures").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
