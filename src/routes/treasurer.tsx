@@ -29,7 +29,7 @@ type Payment = { id: string; name: string; state_code: string; amount: number; r
 type Expenditure = { id: string; description: string; amount: number; date: string; created_at: string };
 type Dashboard = { payments: Payment[]; expenditures: Expenditure[]; totals: { deposits: number; expenditures: number; balance: number } };
 
-const fmt = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(n);
+const fmt = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n);
 
 const TOKEN_KEY = "treasurer_token";
 
