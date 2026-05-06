@@ -21,7 +21,7 @@ export function getSessionConfig(): SessionConfig {
     cookie: {
       httpOnly: true,
       secure: true,
-      sameSite: "lax",
+      sameSite: "none",
       path: "/",
     },
   };
