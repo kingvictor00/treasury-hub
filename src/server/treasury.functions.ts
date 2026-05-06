@@ -97,8 +97,6 @@ function requireAuth(token?: string) {
   if (!expected || !token || !safeEqual(token, expected)) throw new Error("Unauthorized");
 }
 
-const authed = <T extends z.ZodTypeAny>(schema: T) =>
-  z.object({ token: z.string().min(1).max(512) }).and(schema);
 
 // ---------- Treasurer dashboard data ----------
 export const getDashboard = createServerFn({ method: "POST" })
