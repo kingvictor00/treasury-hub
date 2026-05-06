@@ -98,8 +98,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [openForm, setOpenForm] = useState(false);
 
   const refresh = useCallback(async () => {
-    try { setData(await fetchDash() as Dashboard); }
-    catch (err) { toast.error(err instanceof Error ? err.message : "Failed to load"); }
+    try {
+      setData(await fetchDash() as Dashboard);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load";
+      if (message === "Unauthorized") {
+        toast.error("Your session expired. Please sign in again.");
+        onLogout();
+        return;
+      }
+      toast.error(message);
+    }
   }, [fetchDash]);
   useEffect(() => { refresh(); }, [refresh]);
 
