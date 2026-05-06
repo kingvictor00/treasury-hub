@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  treasurerLogin, treasurerLogout, treasurerStatus,
+  treasurerLogin,
   getDashboard, createExpenditure, updateExpenditure, deleteExpenditure, getReceiptUrl,
 } from "@/server/treasury.functions";
 import { Button } from "@/components/ui/button";
@@ -31,17 +31,18 @@ type Dashboard = { payments: Payment[]; expenditures: Expenditure[]; totals: { d
 
 const fmt = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(n);
 
+const TOKEN_KEY = "treasurer_token";
+
 function TreasurerPage() {
-  const status = useServerFn(treasurerStatus);
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  useEffect(() => { status().then((r) => setAuthed(r.authenticated)).catch(() => setAuthed(false)); }, [status]);
-  if (authed === null) {
-    return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  }
-  return authed ? <Dashboard onLogout={() => setAuthed(false)} /> : <Login onSuccess={() => setAuthed(true)} />;
+  const [token, setToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem(TOKEN_KEY) : null
+  );
+  const onSuccess = (t: string) => { sessionStorage.setItem(TOKEN_KEY, t); setToken(t); };
+  const onLogout = () => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); };
+  return token ? <Dashboard token={token} onLogout={onLogout} /> : <Login onSuccess={onSuccess} />;
 }
 
-function Login({ onSuccess }: { onSuccess: () => void }) {
+function Login({ onSuccess }: { onSuccess: (token: string) => void }) {
   const login = useServerFn(treasurerLogin);
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     try {
       const res = await login({ data: { token } });
-      if (res.ok) onSuccess();
+      if (res.ok) onSuccess(token);
       else toast.error(res.error);
     } catch (err) { toast.error(err instanceof Error ? err.message : "Login failed"); }
     finally { setLoading(false); }
@@ -85,9 +86,8 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const fetchDash = useServerFn(getDashboard);
-  const logout = useServerFn(treasurerLogout);
   const create = useServerFn(createExpenditure);
   const update = useServerFn(updateExpenditure);
   const remove = useServerFn(deleteExpenditure);
@@ -99,7 +99,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const refresh = useCallback(async () => {
     try {
-      setData(await fetchDash() as Dashboard);
+      setData(await fetchDash({ data: { token } }) as Dashboard);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load";
       if (message === "Unauthorized") {
@@ -109,13 +109,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       }
       toast.error(message);
     }
-  }, [fetchDash]);
+  }, [fetchDash, token, onLogout]);
   useEffect(() => { refresh(); }, [refresh]);
 
   const onSave = async (vals: { description: string; amount: number; date: string }) => {
     try {
-      if (editing) await update({ data: { id: editing.id, ...vals } });
-      else await create({ data: vals });
+      if (editing) await update({ data: { id: editing.id, token, ...vals } });
+      else await create({ data: { token, ...vals } });
       toast.success(editing ? "Expenditure updated" : "Expenditure added");
       setOpenForm(false); setEditing(null);
       await refresh();
@@ -124,16 +124,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const onDelete = async (id: string) => {
     if (!confirm("Delete this expenditure?")) return;
-    try { await remove({ data: { id } }); toast.success("Deleted"); await refresh(); }
+    try { await remove({ data: { id, token } }); toast.success("Deleted"); await refresh(); }
     catch (err) { toast.error(err instanceof Error ? err.message : "Delete failed"); }
   };
 
   const viewReceipt = async (path: string) => {
-    try { const { url } = await sign({ data: { path } }); window.open(url, "_blank"); }
+    try { const { url } = await sign({ data: { token, path } }); window.open(url, "_blank"); }
     catch (err) { toast.error(err instanceof Error ? err.message : "Could not open receipt"); }
   };
 
-  const doLogout = async () => { await logout(); onLogout(); };
+  const doLogout = () => { onLogout(); };
 
   if (!data) {
     return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
