@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { submitPayment } from "@/server/treasury.functions";
+import { submitPayment, getPublicTotals } from "@/server/treasury.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Loader2, Receipt, ShieldCheck, Upload } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, CheckCircle2, ChevronDown, Loader2, Receipt, ShieldCheck, Upload, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -20,6 +20,8 @@ export const Route = createFileRoute("/")({
   component: SubmitPaymentPage,
 });
 
+const fmt = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n);
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -31,6 +33,29 @@ function fileToBase64(file: File): Promise<string> {
 
 function SubmitPaymentPage() {
   const submit = useServerFn(submitPayment);
+  const fetchTotals = useServerFn(getPublicTotals);
+  const [totals, setTotals] = useState<{ deposits: number; expenditures: number; balance: number } | null>(null);
+  const [showArrow, setShowArrow] = useState(false);
+
+  useEffect(() => {
+    fetchTotals().then(setTotals).catch(() => {});
+  }, [fetchTotals]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight > 40;
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 40;
+      setShowArrow(scrollable && !atBottom);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [totals, success]);
+
   const [name, setName] = useState("");
   const [stateCode, setStateCode] = useState("");
   const [amount, setAmount] = useState("");
@@ -154,7 +179,44 @@ function SubmitPaymentPage() {
             </form>
           </Card>
         )}
+
+        {totals && (
+          <section className="mt-10">
+            <h2 className="mb-4 text-center text-lg font-semibold tracking-tight">Treasury Summary</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card className="p-5" style={{ boxShadow: "var(--shadow-card)" }}>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <ArrowDownCircle className="h-4 w-4 text-success" /> Total Deposits
+                </div>
+                <div className="mt-2 text-2xl font-bold">{fmt(totals.deposits)}</div>
+              </Card>
+              <Card className="p-5" style={{ boxShadow: "var(--shadow-card)" }}>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <ArrowUpCircle className="h-4 w-4 text-destructive" /> Total Expenditures
+                </div>
+                <div className="mt-2 text-2xl font-bold">{fmt(totals.expenditures)}</div>
+              </Card>
+              <Card className="p-5" style={{ boxShadow: "var(--shadow-card)" }}>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Wallet className="h-4 w-4 text-primary" /> Balance
+                </div>
+                <div className="mt-2 text-2xl font-bold">{fmt(totals.balance)}</div>
+              </Card>
+            </div>
+          </section>
+        )}
       </main>
+
+      <div
+        aria-hidden={!showArrow}
+        className={`pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 transition-opacity duration-300 ${
+          showArrow ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg animate-bounce">
+          <ChevronDown className="h-5 w-5" />
+        </div>
+      </div>
     </div>
   );
 }
