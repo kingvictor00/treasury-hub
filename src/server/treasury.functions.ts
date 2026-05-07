@@ -85,6 +85,19 @@ export const treasurerLogout = createServerFn({ method: "POST" }).handler(async 
   return { ok: true };
 });
 
+// ---------- Public totals (no auth) ----------
+export const getPublicTotals = createServerFn({ method: "GET" }).handler(async () => {
+  const [paymentsRes, expRes] = await Promise.all([
+    supabaseAdmin.from("payments").select("amount"),
+    supabaseAdmin.from("expenditures").select("amount"),
+  ]);
+  if (paymentsRes.error) throw new Error(paymentsRes.error.message);
+  if (expRes.error) throw new Error(expRes.error.message);
+  const deposits = paymentsRes.data.reduce((s, p) => s + Number(p.amount), 0);
+  const expenditures = expRes.data.reduce((s, e) => s + Number(e.amount), 0);
+  return { deposits, expenditures, balance: deposits - expenditures };
+});
+
 export const treasurerStatus = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ token: z.string().optional() }).parse(d))
   .handler(async ({ data }) => {
