@@ -54,7 +54,7 @@ function SubmitPaymentPage() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [totals, success]);
+  }, [totals]);
 
   const [name, setName] = useState("");
   const [stateCode, setStateCode] = useState("");
