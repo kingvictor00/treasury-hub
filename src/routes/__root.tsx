@@ -31,11 +31,15 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Treasury — Log Payments & Manage Funds" },
       { name: "description", content: "Submit payment receipts and manage treasury expenditures securely." },
-      { property: "og:title", content: "Treasury Management" },
+      { property: "og:title", content: "Treasury — Log Payments & Manage Funds" },
       { property: "og:description", content: "Submit payment receipts and manage treasury expenditures securely." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Treasury — Log Payments & Manage Funds" },
+      { name: "twitter:description", content: "Submit payment receipts and manage treasury expenditures securely." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cc90f2e5-4379-4d65-b78f-773f9fad21cd/id-preview-cb1404b6--bf72ae47-3a03-480a-81f3-e7567b05d683.lovable.app-1778232053006.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cc90f2e5-4379-4d65-b78f-773f9fad21cd/id-preview-cb1404b6--bf72ae47-3a03-480a-81f3-e7567b05d683.lovable.app-1778232053006.png" },
     ],
     links: [
       {
